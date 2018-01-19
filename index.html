@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en" manifest="weather.appcache">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <title>Weather Api</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    <style>
+        ul.optn{
+            list-style:none;
+        }
+        ul.optn li{
+            padding: 2px;
+        }
+        #console{
+            background:black;
+            color: #55ff55;
+            font-family: monospace;
+        }
+        .rght{
+            position: absolute;
+            right: 0px;
+            padding: 1px;
+        }
+    </style>
+</head>
+<body>
+    <div id="wrapper">        
+        <!-- Page Content -->
+        <div id="page-content-wrapper">
+            <div class="container">
+                <div class="row">
+                    <div class="col col-md-12 " style="border:red solid 1px;"> 
+                        Header
+                        <div class="fa fa-gear rght appSet"></div>
+                    </div>
+                </div>
+                <div id="settings">
+                    <div class="row">
+                        <div class="col col-md-12 col-xs-12">
+                            Settings Pannel
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col col-md-6 col-xs-12">
+                            Show Console Panel on startup : <input type="checkbox" id="consoleShowHide" onchange="consoleShowHide();"/>
+                        </div>
+                    </div>
+                </div>
+                <div id="content1">
+                    <div class="row">
+                        <div class="col col-md-6 col-xs-12">
+                            <h2>Add Cities</h2>
+                            <input type="text" id="city"/>
+                            <input type="button" id="addCity" class="btn btn-primary" value="Add">
+                            <input type="button" id="clearCities" class="btn btn-danger" value="Clear All">
+                        </div>
+                        <div class="col col-md-6 col-xs-12">
+                            <h2>Cities</h2> 
+                            <ul id="cityList" class="optn" >
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col col-md-6">
+                            <h2>Weather Details</h2>
+                            <input type="button" value="Get Details" id="getWdata" class="btn btn-warning">
+                            <div id="weatherContnr">
+                                <ul id = "liWdata">
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="col col-md-6">
+                            <input type="button" class="btn btn-info" value="Console" onclick="javascript:$('#consoleCntnr').toggle();$(this).toggleClass('active');">
+                            <div id="consoleCntnr">
+                                <h2>Console <input type="button" value="X" class="btn btn-danger btn-xs" onclick="javascript:$('#console').val('');"></h2>
+                                <textarea id="console" rows="6" cols="50" readonly></textarea>    
+                            </div>
+                        </div>
+                    </div>
+                </div>    
+            </div>
+        </div>
+        <!-- /#page-content-wrapper -->
+    </div>
+
+    <!-- jQuery (necessary for Bootstrap's JavaScript plugins) -->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
+    <!-- Latest compiled and minified JavaScript -->
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+
+
+    <script>        
+        /*Initialization*/
+        const CITIES = 'CITIES';
+        const SETTINGS = 'SETTINGS'
+        var cities = getAllCitiesFromLS();
+        cities = cities || [];
+        localStorage.setItem(CITIES,JSON.stringify(cities));
+        
+        var settingsObj = getDataFromLS(SETTINGS) || {consoleShowHide:false};
+        localStorage.setItem(SETTINGS,JSON.stringify(settingsObj));
+        
+        const CLEARDAY = `clear-day`,
+                  CLEARNIGHT = `clear-night`,
+                  RAIN = `rain`,
+                  SNOW = `snow`,
+                  SLEET = `sleet`,
+                  WIND = `wind`,
+                  FOG = `fog`,
+                  CLOUDY = `cloudy`,
+                  PARTLYCLOUDYDAY = `partly-cloudy-day`,
+                  PARTLYCLOUDYNIGHT = `partly-cloudy-night`;
+        var log = $('#console');
+        /*Initialization*/
+        
+        (function(){
+            
+            $('#settings').hide();
+            $('#addCity').bind('click',function(){
+                var city = $('#city').val();
+                $('#city').val('');
+                addCity(city);
+                
+            });
+            $('#clearCities').bind('click',function(){
+                clearCities();
+            });
+            $('#cityList').bind('click',function(e){
+                if(!$(e.target).hasClass('xBtn')){
+                    return;
+                }
+                var city = $(e.target).closest('li').attr('id');
+                removeCity(city);
+            });
+            $('#city').keyup(function (e) {
+                if (e.keyCode === 13) {
+                   $('#addCity').trigger('click');
+                }
+            });
+            $('#getWdata').bind('click',function(){
+                populateWdata();
+            });
+            populateCities();
+            
+            $('.appSet').bind('click',function(){
+                $('#settings').toggle();
+                $('#content1').toggle();
+            })
+            
+            init();
+        })();
+        
+        function init(){
+            initSettings(settingsObj);
+        }
+        
+        function addCity(city){
+            addCityInLS(city);
+        }
+        function addCityInLS(city){
+            if(!city){
+                return;
+            }
+            var cities = getAllCitiesFromLS();
+            var coords = getCoords(city);
+            var cityObj = {
+                'city': city,
+                'coords': coords
+                };
+            cities.push(cityObj);
+            localStorage.setItem(CITIES,JSON.stringify(cities));
+            populateCities();
+        }
+        
+        function getAllCitiesFromLS(){
+            return (getDataFromLS(CITIES) || []);
+        }
+        function getDataFromLS(key){
+            return JSON.parse(localStorage.getItem(key));
+        }
+        function populateCities(){
+            var contnr = $('#cityList');
+            var c = getAllCitiesFromLS();
+            var liItems=``;
+            var btnX = `<input type="button" class="btn btn-danger xBtn btn-xs tiny" value="X">`;
+            c.forEach(function(cityObj){
+                var city = cityObj.city;
+                liItems = liItems.concat(`<li id="${city}"> ${btnX} ${city} </li>`);
+            });
+            contnr.html(liItems);
+        }
+        function clearCities(){
+            localStorage.clear();
+            populateCities();
+        }
+        
+        function removeCity(city){
+            var cities = getAllCitiesFromLS();
+            cities = cities.filter(o => o.city != city);
+            localStorage.setItem(CITIES,JSON.stringify(cities));
+            populateCities();
+        }
+        
+        function getCityObj(c){
+            var cs = getAllCitiesFromLS();
+            return cs.filter(function(o){
+                return o.city == c;
+            })[0] || {};
+        }
+        
+        function consoleShowHide(){
+            settingsObj.consoleShowHide = false;
+            if($('#consoleShowHide').is(':checked')){
+                settingsObj.consoleShowHide = true;
+            }
+            putDataInLS(SETTINGS,settingsObj);
+        }
+        
+        function initSettings(settingsObj){
+            if(settingsObj.consoleShowHide){
+                $('#consoleCntnr').show();
+                $('#consoleCntnr').trigger('click');
+                $('#consoleShowHide').prop('checked','checked')
+            }else{
+                $('#consoleCntnr').hide();
+                $('#consoleCntnr').trigger('click');
+                $('#consoleShowHide').removeProp('checked','checked')
+            }
+        }
+        
+        function putDataInLS(strK,strV){
+            localStorage.setItem(strK,JSON.stringify(strV));
+        }
+        //https://darksky.net/dev/docs
+        function getWdata(cityObj){
+            var coords = cityObj.coords;
+            var URL = `https://api.darksky.net/forecast/6178fda7f29e3e27d02185059731245e/${coords}?exclude=minutely,hourly`;
+            $.ajax({
+                url: URL,
+                type: 'GET',
+                cache: false,
+                dataType: 'jsonp',
+                success: function(data){
+                    log.val(`${log.val()} \n ${cityObj.city} darksky api success`);
+                    console.log(cityObj.city,data);
+                    decorateWdata(data,cityObj);
+                },
+                error: function(){
+                    log.val(`${log.val()} \n ${cityObj.city} darksky api ERROR`);
+                }
+            })
+        }
+        
+        //https://developers.google.com/maps/documentation/geocoding/intro
+        function getGeoDataService(city){
+            var URL = `https://maps.googleapis.com/maps/api/geocode/json?address=${city}&key=AIzaSyCp18M3OT80GcJQATvf6hXCoYqVd5lFXzU`;
+            $.ajax({
+                url: URL,
+                type: 'GET',
+                cache: false,
+                async: false,
+                dataType: 'json',
+                success: function(res){
+                    log.val(`${log.val()} \n ${city} google api success`);
+                    if(res.status == 'OK'){
+                        geoData = res.results[0];
+                    }
+                },
+                error: function(){
+                    log.val(`${log.val()} \n ${city} google api ERROR`);
+                }
+            })
+            console.log('geoData = ', geoData);
+            return geoData;
+        }
+
+        function getCoords(city){
+            console.log("city before: ",city);
+            var geoData = getGeoDataService(city);
+            var location = geoData.geometry.location;
+            var lat = location.lat,
+                lng = location.lng;
+            return `${lat},${lng}`;
+        }
+        
+        function populateWdata(){
+            var contnr = $('#liWdata');
+            contnr.html('');
+            var c = getAllCitiesFromLS();
+            c.forEach(function(cityObj){
+                getWdata(cityObj || {});
+            });
+        }
+        
+        function decorateWdata(data,cityObj){
+            var contnr = $('#liWdata');
+            var weather = data.currently.summary;
+            contnr.append(`<li> ${cityObj.city} ${weather} </li>`);
+        }
+    </script>
+</body>
+</html>
